@@ -91,11 +91,16 @@ char owTouchReset()
 {
     char presence = FALSE;
     char sample_count = ( OW_RESET_PULSE_TIME / 8 );
+    char i = 0;
 
     /*low reset pulse*/
     OW_OUTPUT();
     OW_LOW();
-    __delay_us( OW_RESET_PULSE_TIME );
+
+    /* delay during reset pulse time, split it in 10 chunks in case __delay_us
+     * can't handle big numbers */
+    for ( i = 0; i < 10; i++ )
+        __delay_us( OW_RESET_PULSE_TIME / 10 );
 
     /*float high*/
     OW_INPUT();

@@ -38,7 +38,7 @@ typedef struct
     short lastTemp;
 }device_t;
 
-device_t devices[ NUM_DEVICES ];
+static device_t devices[ NUM_DEVICES ];
 
 typedef enum state_e
 {
@@ -48,7 +48,7 @@ typedef enum state_e
     STATE_FETCH_TEMPS,
 }state_t;
 
-state_t state;
+static state_t state;
 
 
 static void ds18b20_scan(void);
@@ -59,7 +59,7 @@ void ds18b20_init()
 {
     memset( devices, 0, sizeof(devices) );
 
-    ds18b20_scan();
+    state = STATE_SCAN;
 }
 
 void ds18b20_work()
@@ -89,7 +89,7 @@ void ds18b20_work()
             ds18b20_fetchTemp( fetchDevice );
             fetchDevice++;
             if ( fetchDevice >= NUM_DEVICES )
-                state = STATE_SCAN;
+                state = STATE_CONVERT;
             break;
     }
 }
@@ -143,7 +143,7 @@ static void ds18b20_fetchTemp( unsigned char device )
         b1 = owReadByte();
         b2 = owReadByte();
 
-        devices[ device ].lastTemp = (b2 << 8) | b1;
+        devices[ device ].lastTemp = ( (unsigned short) b2 << 8 ) | b1;
     }
 }
 

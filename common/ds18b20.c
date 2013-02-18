@@ -35,7 +35,7 @@
 typedef struct
 {
     unsigned char serial[ 8 ];
-    short lastTemp;
+    signed short lastTemp;
 }device_t;
 
 static device_t devices[ NUM_DEVICES ];
@@ -143,7 +143,7 @@ static void ds18b20_fetchTemp( unsigned char device )
         b1 = owReadByte();
         b2 = owReadByte();
 
-        devices[ device ].lastTemp = ( (unsigned short) b2 << 8 ) | b1;
+        devices[ device ].lastTemp = ( (signed short) b2 << 8 ) | ( b1 & 0xFF );
     }
 }
 

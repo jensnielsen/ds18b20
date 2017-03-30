@@ -52,6 +52,7 @@ static state_t state;
 
 
 static void ds18b20_scan(void);
+static char ds18b20_isParasite();
 static void ds18b20_startConvert(void);
 static void ds18b20_fetchTemp( unsigned char device );
 
@@ -113,6 +114,14 @@ static void ds18b20_scan()
             owSerialNum( 0, devices[ i ].serial, 1 );
         }
     }
+}
+
+static char ds18b20_isParasite()
+{
+    owTouchReset();
+    owWriteByte(0xCC);
+    owWriteByte(0xB4);
+    return ( owReadBit() == 0 );
 }
 
 static void ds18b20_startConvert()

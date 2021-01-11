@@ -29,13 +29,16 @@
 #include "ownet.h"
 #include "owlink.h"
 #include <string.h> /*for memset*/
+#include <stdint.h>
+#include <stdbool.h>
 
 #define NUM_DEVICES 4
 
 typedef struct
 {
-    unsigned char serial[ 8 ];
-    signed short lastTemp;
+    uint8_t serial[ 8 ];
+    int16_t lastVal;
+    float lastTemp;
 }device_t;
 
 static device_t devices[ NUM_DEVICES ];
@@ -52,9 +55,9 @@ static state_t state;
 
 
 static void ds18b20_scan(void);
-static char ds18b20_isParasite();
+static bool ds18b20_isParasite();
 static void ds18b20_startConvert(void);
-static void ds18b20_fetchTemp( unsigned char device );
+static void ds18b20_fetchTemp( uint8_t device );
 
 void ds18b20_init()
 {
@@ -63,9 +66,9 @@ void ds18b20_init()
     state = STATE_SCAN;
 }
 
-void ds18b20_work()
+bool ds18b20_work()
 {
-    static unsigned char fetchDevice = 0;
+    static uint8_t fetchDevice = 0;
     switch ( state )
     {
         case STATE_SCAN:
@@ -91,14 +94,22 @@ void ds18b20_work()
             fetchDevice++;
             if ( fetchDevice >= NUM_DEVICES )
                 state = STATE_CONVERT;
+            else
+            	return true;
             break;
     }
+    return false;
+}
+
+float ds18b20_getTemp( uint8_t device )
+{
+    return devices[ device ].lastTemp;
 }
 
 static void ds18b20_scan()
 {
-    unsigned char found;
-    unsigned char i;
+    uint8_t found;
+    uint8_t i;
 
     found = owFirst( 0, 1, 0 );
     if ( found )
@@ -116,7 +127,7 @@ static void ds18b20_scan()
     }
 }
 
-static char ds18b20_isParasite()
+static bool ds18b20_isParasite()
 {
     owTouchReset();
     owWriteByte(0xCC);
@@ -132,12 +143,12 @@ static void ds18b20_startConvert()
     owWriteByte(0x44);
 }
 
-static void ds18b20_fetchTemp( unsigned char device )
+static void ds18b20_fetchTemp( uint8_t device )
 {
     if ( device < NUM_DEVICES && devices[ device ].serial[ 0 ] != 0 )
     {
-        unsigned char i;
-        unsigned char b1, b2;
+        uint8_t i;
+        uint8_t b1, b2;
 
         /*address specified device*/
         owTouchReset();
@@ -152,7 +163,8 @@ static void ds18b20_fetchTemp( unsigned char device )
         b1 = owReadByte();
         b2 = owReadByte();
 
-        devices[ device ].lastTemp = ( (signed short) b2 << 8 ) | ( b1 & 0xFF );
+        devices[ device ].lastVal = ( (int16_t) b2 << 8 ) | ( b1 & 0xFF );
+        devices[ device ].lastTemp = devices[ device ].lastVal * 0.0625;
     }
 }
 

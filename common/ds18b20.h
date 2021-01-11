@@ -29,7 +29,10 @@
 #ifndef DS18B20_H
 #define DS18B20_H
 
+#include <stdint.h>
+
 void ds18b20_init(void);
-void ds18b20_work(void);
+bool ds18b20_work(void);
+float ds18b20_getTemp( uint8_t device );
 
 #endif

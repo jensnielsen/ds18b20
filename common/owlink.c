@@ -42,14 +42,13 @@
 
 #define OW_RESET_PULSE_TIME 520
 
-char owReadBit()
+char owReadBit( void )
 {
     char bit_in;
 
     /*pull low to initiate read*/
     OW_OUTPUT();
     OW_LOW();
-
     __delay_us( OW_LOW_PULSE_TIME );
 
     /*float high*/
@@ -73,11 +72,11 @@ void owWriteBit( char bit_out )
     __delay_us( OW_LOW_PULSE_TIME );
 
     /*write next bit*/
-    if (bit_out & 0x01)
+    if ( bit_out )
         OW_HIGH();
     else
         OW_LOW();
-    
+
     /*wait until end of slot*/
     __delay_us( OW_WRITE_SLOT_WAIT );
 
@@ -87,7 +86,7 @@ void owWriteBit( char bit_out )
 
 }
 
-char owTouchReset()
+char owTouchReset( void )
 {
     char presence = FALSE;
     char sample_count = ( OW_RESET_PULSE_TIME / 8 );
@@ -117,35 +116,18 @@ char owTouchReset()
     return presence;
 }
 
-void owWriteByte(unsigned char data)
+void owWriteByte( unsigned char data )
 {
     unsigned char bit_count;
 
     for (bit_count = 0; bit_count < 8; bit_count++)
     {
-        /*pull low to initiate write*/
-        OW_OUTPUT();
-        OW_LOW();
-        __delay_us( OW_LOW_PULSE_TIME );
-
-        /*write next bit*/
-        if (data & 0x01)
-            OW_HIGH();
-        else
-            OW_LOW();
-
+        owWriteBit(data & 0x01);
         data = data >> 1;
-
-        /*wait until end of slot*/
-        __delay_us( OW_WRITE_SLOT_WAIT );
-
-        /*float high and let device recover*/
-        OW_INPUT();
-        __delay_us( OW_RECOVERY_TIME );
     }
 }
 
-unsigned char owReadByte()
+unsigned char owReadByte( void )
 {
     unsigned char bit_count;
     unsigned char data;
@@ -154,22 +136,10 @@ unsigned char owReadByte()
 
     for ( bit_count = 0; bit_count < 8; bit_count++ )
     {
-        /*pull low to initiate read*/
-        OW_OUTPUT();
-        OW_LOW();
-        __delay_us(OW_LOW_PULSE_TIME);
-
-        /*float high*/
-        OW_INPUT();
-        __delay_us(OW_READ_SAMPLE_WAIT);
-
         /*sample bus and shift into msb*/
         data = data >> 1;
-        if (OW_READ() != 0)
+        if (owReadBit() != 0)
             data |= 0x80;
-
-        /*wait until end of time slot*/
-        __delay_us(OW_END_READ_SLOT_WAIT);
     }
     return data;
 }

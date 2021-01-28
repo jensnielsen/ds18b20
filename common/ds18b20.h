@@ -30,9 +30,23 @@
 #define DS18B20_H
 
 #include <stdint.h>
+#include <stdbool.h>
+
+typedef enum
+{
+    DS18B20_RESOLUTION_9BIT,
+    DS18B20_RESOLUTION_10BIT,
+    DS18B20_RESOLUTION_11BIT,
+    DS18B20_RESOLUTION_12BIT,
+}ds18b20_resolution_t;
+
 
 void ds18b20_init(void);
 bool ds18b20_work(void);
 float ds18b20_getTemp( uint8_t device );
+void ds18b20_setResolution(ds18b20_resolution_t resolution);
+
+void ds18b20_readScratchpad(void);
+
 
 #endif

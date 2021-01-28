@@ -25,14 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
+#include "ds18b20.h"
 #include "ownet.h"
 #include "owlink.h"
 #include <string.h> /*for memset*/
 #include <stdint.h>
 #include <stdbool.h>
 
-#define NUM_DEVICES 4
+#define MAX_NUM_DEVICES 1
 
 typedef struct
 {
@@ -41,7 +41,10 @@ typedef struct
     float lastTemp;
 }device_t;
 
-static device_t devices[ NUM_DEVICES ];
+static device_t devices[ MAX_NUM_DEVICES ];
+static uint8_t attachedDevices = 0;
+static ds18b20_resolution_t resolution = DS18B20_RESOLUTION_12BIT;
+static bool updateResolution = false;
 
 typedef enum state_e
 {
@@ -49,24 +52,27 @@ typedef enum state_e
     STATE_CONVERT,
     STATE_WAIT_CONVERT,
     STATE_FETCH_TEMPS,
+    STATE_DONE,
 }state_t;
 
 static state_t state;
 
 
 static void ds18b20_scan(void);
-static bool ds18b20_isParasite();
+static bool ds18b20_isParasite(void);
 static void ds18b20_startConvert(void);
 static void ds18b20_fetchTemp( uint8_t device );
+static void ds18b20_configureResolution(ds18b20_resolution_t resolution);
 
-void ds18b20_init()
+void ds18b20_init(void)
 {
     memset( devices, 0, sizeof(devices) );
+    attachedDevices = 0;
 
     state = STATE_SCAN;
 }
 
-bool ds18b20_work()
+bool ds18b20_work(void)
 {
     static uint8_t fetchDevice = 0;
     switch ( state )
@@ -77,6 +83,11 @@ bool ds18b20_work()
             break;
 
         case STATE_CONVERT:
+            if (updateResolution)
+            {
+                ds18b20_configureResolution(resolution);
+                updateResolution = false;
+            }
             ds18b20_startConvert();
             state = STATE_WAIT_CONVERT;
             break;
@@ -92,50 +103,65 @@ bool ds18b20_work()
         case STATE_FETCH_TEMPS:
             ds18b20_fetchTemp( fetchDevice );
             fetchDevice++;
-            if ( fetchDevice >= NUM_DEVICES )
-                state = STATE_CONVERT;
-            else
-            	return true;
+            if ( fetchDevice >= attachedDevices )
+            {
+                state = STATE_CONVERT; //STATE_DONE for single conversion
+                return true;
+            }
             break;
+
+        case STATE_DONE:
+            return true;
     }
     return false;
 }
 
 float ds18b20_getTemp( uint8_t device )
 {
-    return devices[ device ].lastTemp;
+    if ( device < attachedDevices)
+    {
+        return devices[ device ].lastTemp;
+    }
+    else
+    {
+        return 0;
+    }
 }
 
-static void ds18b20_scan()
+static void ds18b20_scan(void)
 {
     uint8_t found;
     uint8_t i;
 
+    attachedDevices = 0;
     found = owFirst( 0, 1, 0 );
     if ( found )
     {
+        attachedDevices++;
         owSerialNum( 0, devices[ 0 ].serial, 1 );
     }
 
-    for ( i = 1; found && i < NUM_DEVICES; i++ )
+    for ( i = 1; found && i < MAX_NUM_DEVICES; i++ )
     {
         found = owNext( 0, 1, 0 );
         if ( found )
         {
+            attachedDevices++;
             owSerialNum( 0, devices[ i ].serial, 1 );
         }
     }
 }
 
-static bool ds18b20_isParasite()
+static bool ds18b20_isParasite(void)
 {
+    /*issue Read Power Supply to all devices, any parasite powered devices will pull bus low*/
     owTouchReset();
     owWriteByte(0xCC);
     owWriteByte(0xB4);
     return ( owReadBit() == 0 );
 }
 
-static void ds18b20_startConvert()
+static void ds18b20_startConvert(void)
 {
     /*issue convert temp to all devices*/
     owTouchReset();
@@ -145,18 +171,23 @@ static void ds18b20_startConvert()
 
 static void ds18b20_fetchTemp( uint8_t device )
 {
-    if ( device < NUM_DEVICES && devices[ device ].serial[ 0 ] != 0 )
+    if ( device < attachedDevices && devices[ device ].serial[ 0 ] != 0 )
     {
         uint8_t i;
         uint8_t b1, b2;
 
-        /*address specified device*/
         owTouchReset();
+#if MAX_NUM_DEVICES == 1
+        /*only one device allowed, we can save time by sending skip rom*/
+        owWriteByte(0xCC);
+#else
+        /*address specified device*/
         owWriteByte(0x55);
         for (i = 0; i < 8; i++)
         {
             owWriteByte(devices[ device ].serial[ i ]);
         }
+#endif
 
         /*read the first two bytes of scratchpad*/
         owWriteByte(0xBE);
@@ -168,3 +199,34 @@ static void ds18b20_fetchTemp( uint8_t device )
     }
 }
 
+//for debug
+volatile uint8_t scratchpad[5];
+void ds18b20_readScratchpad(void)
+{
+    uint8_t i;
+    owTouchReset();
+    owWriteByte(0xCC);
+    owWriteByte(0xBE);
+    for (i = 0; i < 5; i++)
+    {
+        scratchpad[i] = owReadByte();
+    }
+}
+
+void ds18b20_setResolution(ds18b20_resolution_t newResolution)
+{
+    resolution = newResolution;
+    updateResolution = true;
+}
+
+static void ds18b20_configureResolution(ds18b20_resolution_t resolution)
+{
+    /*issue write scratchpad to all devices*/
+    owTouchReset();
+    owWriteByte(0xCC);
+    owWriteByte(0x4E);
+
+    owWriteByte(0x00);
+    owWriteByte(0x00);
+    owWriteByte(resolution << 5);
+}

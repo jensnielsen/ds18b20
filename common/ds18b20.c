@@ -79,7 +79,10 @@ bool ds18b20_work(void)
     {
         case STATE_SCAN:
             ds18b20_scan();
-            state = STATE_CONVERT;
+            if ( attachedDevices > 0 )
+            {
+                state = STATE_CONVERT;
+            }
             break;
 
         case STATE_CONVERT:
